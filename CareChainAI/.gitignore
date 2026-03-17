@@ -1,0 +1,22 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+
+# Sensitive — NEVER push
+backend/.env
+backend/healthvault.db
+backend/faiss_index*
+backend/uploads/
+
+# Next.js
+frontend/.next/
+frontend/node_modules/
+node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
