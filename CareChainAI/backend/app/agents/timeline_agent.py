@@ -134,10 +134,55 @@ class TimelineAgent:
 
     # ── Summary generation ────────────────────────────────────────────────
 
+
     @staticmethod
     def _generate_summary(text: str, report_type: str) -> str:
-        """Produce a short (~2 sentence) extractive summary from the first ~500 chars."""
-        sentences = re.split(r"(?<=[.!?])\s+", text.strip())
-        meaningful = [s for s in sentences if len(s) > 30][:3]
-        base = " ".join(meaningful) if meaningful else text[:300]
-        return f"[{report_type.upper()}] {base[:400]}"
+        lines = [l.strip() for l in text.strip().splitlines() if l.strip()]
+
+    # Extract key fields
+        date        = next((l for l in lines if any(d in l.lower() for d in ["date:", "dated:"])), "")
+        doctor      = next((l for l in lines if "dr." in l.lower() or "doctor:" in l.lower()), "")
+        hospital    = next((l for l in lines if any(h in l.lower() for h in ["hospital", "clinic", "centre"])), "")
+        diagnosis   = next((l for l in lines if any(d in l.lower() for d in ["diagnosis:", "impression:", "conclusion:"])), "")
+        medications = [l for l in lines if any(m in l.lower() for m in ["tab ", "cap ", "mg", "ml", "syrup", "inj "])][:3]
+
+        parts = []
+
+        if report_type == "prescription":
+            parts.append("💊 Prescription")
+            if doctor:    parts.append(f"Doctor: {doctor[:60]}")
+            if hospital:  parts.append(f"Hospital: {hospital[:60]}")
+            if medications: parts.append(f"Medications: {', '.join([m[:40] for m in medications])}")
+
+        elif report_type == "lab":
+            parts.append("🧪 Lab Report")
+            if diagnosis: parts.append(f"Finding: {diagnosis[:80]}")
+            # Extract abnormal values
+            abnormal = [l for l in lines if "high" in l.lower() or "low" in l.lower() or "abnormal" in l.lower()][:2]
+            if abnormal:  parts.append(f"Abnormal: {', '.join([a[:50] for a in abnormal])}")
+
+        elif report_type == "mri":
+            parts.append("🧲 MRI Report")
+            if diagnosis: parts.append(f"Impression: {diagnosis[:100]}")
+
+        elif report_type == "xray":
+            parts.append("☢️ X-Ray Report")
+            if diagnosis: parts.append(f"Finding: {diagnosis[:100]}")
+
+        elif report_type == "discharge":
+            parts.append("🏥 Discharge Summary")
+            if diagnosis: parts.append(f"Diagnosis: {diagnosis[:80]}")
+            if doctor:    parts.append(f"Doctor: {doctor[:60]}")
+
+        else:
+            parts.append(f"📄 {report_type.upper()} Report")
+            if diagnosis: parts.append(diagnosis[:100])
+
+    # Fallback if nothing extracted
+        if len(parts) <= 1:
+            sentences = re.split(r"(?<=[.!?])\s+", text.strip())
+            meaningful = [s for s in sentences if len(s) > 20][:2]
+            if meaningful:
+                parts.append(" ".join(meaningful)[:200])
+
+        return " · ".join(parts)

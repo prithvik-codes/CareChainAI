@@ -80,9 +80,9 @@ export default function AdminPage() {
     try {
       const headers = { Authorization: `Bearer ${token}` };
       const [statsRes, patientsRes, reportsRes] = await Promise.all([
-        fetch("http://localhost:8000/api/admin/stats",    { headers }),
-        fetch("http://localhost:8000/api/admin/patients", { headers }),
-        fetch("http://localhost:8000/api/admin/reports",  { headers }),
+        fetch("http://10.157.36.194:8000/api/admin/stats",    { headers }),
+        fetch("http://10.157.36.194:8000/api/admin/patients", { headers }),
+        fetch("http://10.157.36.194:8000/api/admin/reports",  { headers }),
       ]);
       setStats(await statsRes.json());
       setPatients(await patientsRes.json());
@@ -99,7 +99,7 @@ export default function AdminPage() {
   const handleDeleteUser = async (id: number) => {
     setDeleting(id);
     try {
-      await fetch(`http://localhost:8000/api/admin/users/${id}`, {
+      await fetch(`http://10.157.36.194:8000/api/admin/users/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });

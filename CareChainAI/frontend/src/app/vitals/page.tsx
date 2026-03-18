@@ -51,7 +51,7 @@ export default function VitalsPage() {
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : "";
 
   const fetchVitals = () => {
-    fetch("http://localhost:8000/api/vitals/", { headers: { Authorization: `Bearer ${token}` } })
+    fetch("http://10.157.36.194:8000/api/vitals/", { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json()).then(setVitals).finally(() => setLoading(false));
   };
 
@@ -69,7 +69,7 @@ export default function VitalsPage() {
     if (form.oxygen_saturation)  body.oxygen_saturation  = parseFloat(form.oxygen_saturation);
     if (form.notes)              body.notes              = form.notes;
 
-    await fetch("http://localhost:8000/api/vitals/", {
+    await fetch("http://10.157.36.194:8000/api/vitals/", {
       method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify(body),
     });
@@ -79,7 +79,7 @@ export default function VitalsPage() {
   };
 
   const handleDelete = async (id: number) => {
-    await fetch(`http://localhost:8000/api/vitals/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+    await fetch(`http://10.157.36.194:8000/api/vitals/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
     setVitals((prev) => prev.filter((v) => v.id !== id));
   };
 

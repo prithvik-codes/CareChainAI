@@ -162,7 +162,7 @@ export default function UploadPage() {
       if (hospitalName) form.append("hospital_name", hospitalName);
       if (doctorName)   form.append("doctor_name", doctorName);
 
-      const res = await fetch("http://localhost:8000/api/reports/upload", {
+      const res = await fetch("http://10.157.36.194:8000/api/reports/upload", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         body: form,

@@ -10,7 +10,7 @@ export default function SignupPage() {
     setError("");
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:8000/api/auth/signup", {
+      const res = await fetch("http://10.157.36.194:8000/api/auth/signup", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify(form),
@@ -24,7 +24,7 @@ export default function SignupPage() {
       localStorage.setItem("user_name", data.name);
 
       // Redirect based on role
-      window.location.href = data.role === "doctor" ? "/doctor" : "/dashboard";
+      window.location.href = data.role === "doctor" ? "/doctor" : "/onboarding";
     } catch (e: any) {
       setError(e.message);
     } finally {

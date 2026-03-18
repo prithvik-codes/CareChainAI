@@ -33,20 +33,21 @@ function handleLogout() {
 }
 
 export default function DoctorDashboard() {
-  const [reports, setReports]   = useState<ReportOut[]>([]);
-  const [loading, setLoading]   = useState(true);
-  const [userName, setUserName] = useState("Doctor");
+  const [reports,   setReports]   = useState<ReportOut[]>([]);
+  const [loading,   setLoading]   = useState(true);
+  const [userName,  setUserName]  = useState("Doctor");
+  const [activeTab, setActiveTab] = useState<"all" | "pending" | "done" | "failed">("all");
+  const [search,    setSearch]    = useState("");
 
   useEffect(() => {
     const token = localStorage.getItem("token");
     const role  = localStorage.getItem("role");
     const name  = localStorage.getItem("user_name");
-
     if (!token) { window.location.href = "/auth/login"; return; }
     if (role === "patient") { window.location.href = "/dashboard"; return; }
     if (name) setUserName(name);
 
-    fetch("http://localhost:8000/api/reports/", {
+    fetch("http://10.157.36.194:8000/api/reports/", {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => r.json())
@@ -55,166 +56,230 @@ export default function DoctorDashboard() {
       .finally(() => setLoading(false));
   }, []);
 
-  const done       = reports.filter((r) => r.status === "done").length;
-  const pending    = reports.filter((r) => r.status === "pending" || r.status === "processing").length;
-  const failed     = reports.filter((r) => r.status === "failed").length;
-  const typeCounts = reports.reduce((acc, r) => {
-    acc[r.report_type] = (acc[r.report_type] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+  const filtered = reports
+    .filter((r) => activeTab === "all" || r.status === activeTab)
+    .filter((r) =>
+      search === "" ||
+      r.original_filename.toLowerCase().includes(search.toLowerCase()) ||
+      (r.hospital_name || "").toLowerCase().includes(search.toLowerCase()) ||
+      r.report_type.toLowerCase().includes(search.toLowerCase())
+    );
+
+  const stats = {
+    total:      reports.length,
+    done:       reports.filter((r) => r.status === "done").length,
+    pending:    reports.filter((r) => r.status === "pending" || r.status === "processing").length,
+    failed:     reports.filter((r) => r.status === "failed").length,
+    types:      new Set(reports.map((r) => r.report_type)).size,
+  };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
+    <div className="min-h-screen bg-[#0f0f1a] text-white">
 
-      {/* ── Top navbar ── */}
-      <div className="bg-slate-900 border-b border-slate-800 px-8 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-violet-600 rounded-xl flex items-center justify-center font-bold text-lg">
-            👨‍⚕️
-          </div>
-          <div>
-            <div className="font-bold">Dr. {userName}</div>
-            <div className="text-xs text-violet-400">Doctor Portal</div>
+      {/* ── Sidebar ── */}
+      <div className="fixed left-0 top-0 bottom-0 w-64 bg-[#13132b] border-r border-violet-900/30 flex flex-col z-10">
+        {/* Logo */}
+        <div className="p-6 border-b border-violet-900/30">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-violet-600 rounded-xl flex items-center justify-center text-xl">👨‍⚕️</div>
+            <div>
+              <div className="font-bold text-violet-200">Dr. {userName}</div>
+              <div className="text-xs text-violet-400">Medical Professional</div>
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 bg-cyan-500 rounded-lg flex items-center justify-center text-slate-950 font-bold text-sm">C</div>
-          <span className="font-bold">CareChainAI</span>
+
+        {/* Nav */}
+        <nav className="flex-1 p-4 space-y-1">
+          {[
+            { icon: "📊", label: "Dashboard",       href: "/doctor",       active: true },
+            { icon: "⬆️", label: "Upload Report",   href: "/upload",       active: false },
+            { icon: "🤖", label: "AI Analysis",     href: "/ask-ai",       active: false },
+            { icon: "📅", label: "Timeline",        href: "/timeline",     active: false },
+            { icon: "💊", label: "Medications",     href: "/medications",  active: false },
+            { icon: "🗓️", label: "Appointments",   href: "/appointments", active: false },
+            { icon: "🛡️", label: "Database",       href: "/admin",        active: false },
+          ].map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm transition-all ${
+                item.active
+                  ? "bg-violet-600/20 text-violet-300 border border-violet-600/30"
+                  : "text-slate-400 hover:bg-violet-900/20 hover:text-violet-200"
+              }`}
+            >
+              <span>{item.icon}</span>
+              <span>{item.label}</span>
+            </Link>
+          ))}
+        </nav>
+
+        {/* Logout */}
+        <div className="p-4 border-t border-violet-900/30">
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm text-slate-400 hover:bg-rose-900/20 hover:text-rose-400 transition-all"
+          >
+            <span>🚪</span>
+            <span>Logout</span>
+          </button>
         </div>
-        <button
-          onClick={handleLogout}
-          className="px-4 py-2 bg-slate-800 hover:bg-rose-900 border border-slate-700 hover:border-rose-700 text-slate-300 hover:text-rose-300 rounded-xl text-sm transition-all"
-        >
-          🚪 Logout
-        </button>
       </div>
 
-      <div className="max-w-6xl mx-auto px-8 py-8">
+      {/* ── Main content ── */}
+      <div className="ml-64 p-8">
 
-        {/* Welcome banner */}
-        <div className="bg-gradient-to-r from-violet-900/40 to-cyan-900/40 border border-violet-700/40 rounded-2xl p-6 mb-8">
-          <h1 className="text-2xl font-bold mb-1">Welcome, Dr. {userName} 👋</h1>
-          <p className="text-slate-400 text-sm">
-            Review uploaded patient reports, analyse medical records and use AI assistance.
-          </p>
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-1">
+            <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+            <span className="text-xs text-emerald-400 font-medium uppercase tracking-wide">Doctor Portal</span>
+          </div>
+          <h1 className="text-3xl font-bold text-white">Medical Records Dashboard</h1>
+          <p className="text-slate-400 text-sm mt-1">Review and analyse patient reports</p>
         </div>
 
-        {/* ── Stats ── */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        {/* Stats row */}
+        <div className="grid grid-cols-5 gap-4 mb-8">
           {[
-            { label: "Total Reports",  value: reports.length, icon: "📁", color: "text-cyan-400" },
-            { label: "Analysed",       value: done,           icon: "✅", color: "text-emerald-400" },
-            { label: "Pending",        value: pending,        icon: "⏳", color: "text-amber-400" },
-            { label: "Failed",         value: failed,         icon: "❌", color: "text-rose-400" },
+            { label: "Total Reports",  value: stats.total,   icon: "📁", color: "border-violet-700 bg-violet-900/20", val: "text-violet-300" },
+            { label: "Analysed",       value: stats.done,    icon: "✅", color: "border-emerald-700 bg-emerald-900/20", val: "text-emerald-300" },
+            { label: "Pending",        value: stats.pending, icon: "⏳", color: "border-amber-700 bg-amber-900/20", val: "text-amber-300" },
+            { label: "Failed",         value: stats.failed,  icon: "❌", color: "border-rose-700 bg-rose-900/20", val: "text-rose-300" },
+            { label: "Report Types",   value: stats.types,   icon: "📊", color: "border-cyan-700 bg-cyan-900/20", val: "text-cyan-300" },
           ].map((s) => (
-            <div key={s.label} className="bg-slate-800 border border-slate-700 rounded-xl p-5">
-              <div className="text-2xl mb-1">{s.icon}</div>
-              <div className={`text-3xl font-bold ${s.color}`}>{s.value}</div>
-              <div className="text-slate-400 text-sm mt-1">{s.label}</div>
+            <div key={s.label} className={`border rounded-2xl p-4 ${s.color}`}>
+              <div className="text-xl mb-2">{s.icon}</div>
+              <div className={`text-3xl font-bold ${s.val}`}>{s.value}</div>
+              <div className="text-slate-400 text-xs mt-1">{s.label}</div>
             </div>
           ))}
         </div>
 
-        {/* ── Report type breakdown ── */}
-        {Object.keys(typeCounts).length > 0 && (
-          <div className="bg-slate-800/60 border border-slate-700 rounded-2xl p-5 mb-8">
-            <h2 className="text-sm font-semibold text-slate-300 mb-3">Report Type Breakdown</h2>
-            <div className="flex flex-wrap gap-3">
-              {Object.entries(typeCounts).map(([type, count]) => (
-                <div key={type} className="flex items-center gap-2 bg-slate-900 border border-slate-700 rounded-xl px-4 py-2">
-                  <span>{TYPE_ICONS[type] || "📄"}</span>
-                  <span className="text-sm font-medium capitalize">{type}</span>
-                  <span className="text-cyan-400 font-bold text-sm">{count}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ── Quick actions — Doctor specific ── */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
-          {[
-            { href: "/upload",    label: "Upload Report",    icon: "⬆️", color: "from-cyan-700 to-cyan-900",    desc: "Add new patient document" },
-            { href: "/ask-ai",    label: "AI Analysis",      icon: "🤖", color: "from-violet-700 to-violet-900", desc: "Query patient records with AI" },
-            { href: "/timeline",  label: "Patient Timeline", icon: "📅", color: "from-emerald-700 to-emerald-900", desc: "View chronological history" },
-          ].map((a) => (
-            <Link
-              key={a.href}
-              href={a.href}
-              className={`bg-gradient-to-br ${a.color} border border-white/10 rounded-2xl p-5 hover:scale-105 transition-transform`}
-            >
-              <div className="text-3xl mb-2">{a.icon}</div>
-              <div className="font-semibold">{a.label}</div>
-              <div className="text-white/60 text-xs mt-1">{a.desc}</div>
-            </Link>
-          ))}
+        {/* Quick tools */}
+        <div className="grid grid-cols-3 gap-4 mb-8">
+          <Link href="/upload" className="bg-gradient-to-br from-violet-800 to-violet-950 border border-violet-700/50 rounded-2xl p-5 hover:scale-105 transition-transform group">
+            <div className="text-3xl mb-3 group-hover:scale-110 transition-transform">📤</div>
+            <div className="font-semibold text-violet-200">Upload Patient Report</div>
+            <div className="text-violet-400 text-xs mt-1">Add new medical document</div>
+          </Link>
+          <Link href="/ask-ai" className="bg-gradient-to-br from-emerald-800 to-emerald-950 border border-emerald-700/50 rounded-2xl p-5 hover:scale-105 transition-transform group">
+            <div className="text-3xl mb-3 group-hover:scale-110 transition-transform">🤖</div>
+            <div className="font-semibold text-emerald-200">AI Clinical Analysis</div>
+            <div className="text-emerald-400 text-xs mt-1">Query reports with Gemini AI</div>
+          </Link>
+          <Link href="/timeline" className="bg-gradient-to-br from-cyan-800 to-cyan-950 border border-cyan-700/50 rounded-2xl p-5 hover:scale-105 transition-transform group">
+            <div className="text-3xl mb-3 group-hover:scale-110 transition-transform">📋</div>
+            <div className="font-semibold text-cyan-200">Patient History</div>
+            <div className="text-cyan-400 text-xs mt-1">Chronological record view</div>
+          </Link>
         </div>
 
-        {/* ── Reports table ── */}
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold">All Reports</h2>
-          <span className="text-slate-400 text-sm">{reports.length} total</span>
-        </div>
-
-        {loading ? (
-          <div className="flex items-center gap-3 text-slate-400 py-8">
-            <div className="w-5 h-5 border-2 border-slate-600 border-t-violet-400 rounded-full animate-spin" />
-            Loading reports...
-          </div>
-        ) : reports.length === 0 ? (
-          <div className="bg-slate-800 border border-slate-700 rounded-2xl p-10 text-center text-slate-400">
-            <div className="text-4xl mb-3">📂</div>
-            <div className="font-semibold mb-1">No reports found</div>
-            <p className="text-sm mb-4">Upload patient reports to get started.</p>
-            <Link href="/upload" className="px-5 py-2.5 bg-violet-600 hover:bg-violet-500 rounded-xl text-sm font-semibold transition-colors">
-              Upload Report →
-            </Link>
-          </div>
-        ) : (
-          <div className="bg-slate-800/60 border border-slate-700 rounded-2xl overflow-hidden">
-            {/* Table header */}
-            <div className="grid grid-cols-5 gap-4 px-5 py-3 border-b border-slate-700 text-xs text-slate-400 font-medium uppercase tracking-wide">
-              <div className="col-span-2">Report</div>
-              <div>Type</div>
-              <div>Date</div>
-              <div>Status</div>
+        {/* Reports table */}
+        <div className="bg-[#13132b] border border-violet-900/30 rounded-2xl overflow-hidden">
+          {/* Table header with search + filter */}
+          <div className="px-6 py-4 border-b border-violet-900/30 flex items-center justify-between gap-4">
+            <h2 className="font-semibold text-violet-200">Patient Reports</h2>
+            <div className="flex items-center gap-3">
+              {/* Search */}
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search reports..."
+                className="bg-[#0f0f1a] border border-violet-900/50 rounded-xl px-4 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-violet-500 w-48"
+              />
+              {/* Filter tabs */}
+              <div className="flex gap-1 bg-[#0f0f1a] border border-violet-900/50 rounded-xl p-1">
+                {(["all", "pending", "done", "failed"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`px-3 py-1 rounded-lg text-xs font-medium capitalize transition-all ${
+                      activeTab === tab
+                        ? "bg-violet-600 text-white"
+                        : "text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
             </div>
-            {/* Table rows */}
-            {reports.map((r) => (
+          </div>
+
+          {/* Column headers */}
+          <div className="grid grid-cols-12 gap-3 px-6 py-3 border-b border-violet-900/20 text-xs text-violet-400 font-medium uppercase tracking-wide">
+            <div className="col-span-1">#</div>
+            <div className="col-span-3">Report</div>
+            <div className="col-span-2">Type</div>
+            <div className="col-span-2">Date</div>
+            <div className="col-span-2">Hospital</div>
+            <div className="col-span-1">Status</div>
+            <div className="col-span-1">Action</div>
+          </div>
+
+          {/* Rows */}
+          {loading ? (
+            <div className="flex items-center justify-center gap-3 py-16 text-slate-400">
+              <div className="w-5 h-5 border-2 border-violet-700 border-t-violet-400 rounded-full animate-spin" />
+              Loading reports...
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center py-16 text-slate-400">
+              <div className="text-4xl mb-3">📂</div>
+              <div className="font-semibold mb-1">No reports found</div>
+              <Link href="/upload" className="mt-3 inline-block px-5 py-2 bg-violet-600 hover:bg-violet-500 rounded-xl text-sm font-semibold transition-colors">
+                Upload First Report
+              </Link>
+            </div>
+          ) : (
+            filtered.map((r, i) => (
               <div
                 key={r.id}
-                className="grid grid-cols-5 gap-4 px-5 py-4 border-b border-slate-700/50 last:border-0 hover:bg-slate-700/30 transition-colors items-center"
+                className="grid grid-cols-12 gap-3 px-6 py-4 border-b border-violet-900/10 last:border-0 hover:bg-violet-900/10 transition-colors items-center"
               >
-                <div className="col-span-2 flex items-center gap-3 min-w-0">
-                  <span className="text-xl flex-shrink-0">{TYPE_ICONS[r.report_type] || "📄"}</span>
+                <div className="col-span-1 text-violet-600 text-xs font-mono">#{r.id}</div>
+                <div className="col-span-3 flex items-center gap-2 min-w-0">
+                  <span className="text-lg flex-shrink-0">{TYPE_ICONS[r.report_type] || "📄"}</span>
                   <div className="min-w-0">
-                    <div className="text-sm font-medium truncate">{r.original_filename}</div>
-                    {r.hospital_name && (
-                      <div className="text-xs text-slate-400 truncate">🏥 {r.hospital_name}</div>
-                    )}
+                    <div className="text-sm font-medium text-white truncate">{r.original_filename}</div>
+                    {r.doctor_name && <div className="text-xs text-slate-500 truncate">👨‍⚕️ {r.doctor_name}</div>}
                   </div>
                 </div>
-                <div className="text-sm text-slate-300 capitalize">{r.report_type}</div>
-                <div className="text-sm text-slate-400">{r.report_date || "—"}</div>
-                <div>
-                  <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[r.status]}`}>
+                <div className="col-span-2">
+                  <span className="px-2 py-1 bg-violet-900/40 text-violet-300 rounded-lg text-xs capitalize">{r.report_type}</span>
+                </div>
+                <div className="col-span-2 text-slate-400 text-sm">{r.report_date || "—"}</div>
+                <div className="col-span-2 text-slate-400 text-xs truncate">{r.hospital_name || "—"}</div>
+                <div className="col-span-1">
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[r.status]}`}>
                     {r.status}
                   </span>
                 </div>
+                <div className="col-span-1">
+                  <Link
+                    href="/ask-ai"
+                    className="px-2 py-1 bg-emerald-900/40 hover:bg-emerald-700/40 text-emerald-400 text-xs rounded-lg transition-colors"
+                    title="Analyse with AI"
+                  >
+                    🤖 Ask AI
+                  </Link>
+                </div>
               </div>
-            ))}
-          </div>
-        )}
+            ))
+          )}
+        </div>
 
-        {/* ── AI summary banner ── */}
-        {done > 0 && (
-          <div className="mt-8 bg-gradient-to-r from-emerald-900/30 to-cyan-900/30 border border-emerald-700/40 rounded-2xl p-5 flex items-center justify-between">
+        {/* AI analysis CTA */}
+        {stats.done > 0 && (
+          <div className="mt-6 bg-gradient-to-r from-violet-900/30 to-emerald-900/30 border border-violet-700/30 rounded-2xl p-5 flex items-center justify-between">
             <div>
-              <div className="font-semibold mb-1">🤖 AI Analysis Ready</div>
-              <div className="text-slate-400 text-sm">{done} report{done !== 1 ? "s" : ""} processed and ready for AI queries.</div>
+              <div className="font-semibold text-violet-200 mb-1">🤖 {stats.done} report{stats.done !== 1 ? "s" : ""} ready for AI clinical analysis</div>
+              <div className="text-slate-400 text-sm">Use Gemini AI to query patient records and get clinical insights.</div>
             </div>
-            <Link href="/ask-ai" className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-sm font-semibold transition-colors flex-shrink-0">
-              Ask AI →
+            <Link href="/ask-ai" className="px-5 py-2.5 bg-violet-600 hover:bg-violet-500 rounded-xl text-sm font-semibold transition-colors flex-shrink-0">
+              Start Analysis →
             </Link>
           </div>
         )}

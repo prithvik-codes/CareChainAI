@@ -163,6 +163,12 @@ async def delete_report(
     if not report or report.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Report not found")
 
+    # Delete embeddings first to avoid NOT NULL constraint error
+    from sqlalchemy import delete as sql_delete
+    from app.models.embedding import Embedding
+    await db.execute(sql_delete(Embedding).where(Embedding.report_id == report_id))
+
+    # Delete file from disk
     try:
         os.remove(report.file_path)
     except FileNotFoundError:

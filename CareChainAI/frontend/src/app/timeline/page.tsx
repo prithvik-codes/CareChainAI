@@ -65,7 +65,7 @@ export default function TimelinePage() {
     const token = localStorage.getItem("token");
     if (!token) { window.location.href = "/auth/login"; return; }
 
-    fetch("http://localhost:8000/api/timeline/", {
+    fetch("http://10.157.36.194:8000/api/timeline/", {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => r.json())

@@ -37,7 +37,7 @@ export default function AppointmentsPage() {
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : "";
 
   const fetchAppts = () => {
-    fetch("http://localhost:8000/api/appointments/", { headers: { Authorization: `Bearer ${token}` } })
+    fetch("http://10.157.36.194:8000/api/appointments/", { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json()).then(setAppointments).finally(() => setLoading(false));
   };
 
@@ -46,7 +46,7 @@ export default function AppointmentsPage() {
   const handleSave = async () => {
     if (!form.doctor_name || !form.date) return;
     setSaving(true);
-    await fetch("http://localhost:8000/api/appointments/", {
+    await fetch("http://10.157.36.194:8000/api/appointments/", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ ...form, hospital: form.hospital || null, specialty: form.specialty || null, time: form.time || null, reason: form.reason || null, notes: form.notes || null }),
@@ -57,7 +57,7 @@ export default function AppointmentsPage() {
   };
 
   const updateStatus = async (id: number, status: string) => {
-    const res = await fetch(`http://localhost:8000/api/appointments/${id}/status?status=${status}`, {
+    const res = await fetch(`http://10.157.36.194:8000/api/appointments/${id}/status?status=${status}`, {
       method: "PATCH", headers: { Authorization: `Bearer ${token}` },
     });
     const updated = await res.json();
@@ -65,7 +65,7 @@ export default function AppointmentsPage() {
   };
 
   const deleteAppt = async (id: number) => {
-    await fetch(`http://localhost:8000/api/appointments/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+    await fetch(`http://10.157.36.194:8000/api/appointments/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
     setAppointments((prev) => prev.filter((a) => a.id !== id));
   };
 

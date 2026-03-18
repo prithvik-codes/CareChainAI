@@ -32,7 +32,7 @@ export default function MedicationsPage() {
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : "";
 
   const fetchMeds = () => {
-    fetch("http://localhost:8000/api/medications/", { headers: { Authorization: `Bearer ${token}` } })
+    fetch("http://10.157.36.194:8000/api/medications/", { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json()).then(setMeds).finally(() => setLoading(false));
   };
 
@@ -41,7 +41,7 @@ export default function MedicationsPage() {
   const handleSave = async () => {
     if (!form.name || !form.dosage || !form.frequency) return;
     setSaving(true);
-    await fetch("http://localhost:8000/api/medications/", {
+    await fetch("http://10.157.36.194:8000/api/medications/", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ ...form, end_date: form.end_date || null }),
@@ -52,7 +52,7 @@ export default function MedicationsPage() {
   };
 
   const toggleActive = async (id: number) => {
-    const res = await fetch(`http://localhost:8000/api/medications/${id}/toggle`, {
+    const res = await fetch(`http://10.157.36.194:8000/api/medications/${id}/toggle`, {
       method: "PATCH", headers: { Authorization: `Bearer ${token}` },
     });
     const updated = await res.json();
@@ -60,7 +60,7 @@ export default function MedicationsPage() {
   };
 
   const deleteMed = async (id: number) => {
-    await fetch(`http://localhost:8000/api/medications/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+    await fetch(`http://10.157.36.194:8000/api/medications/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
     setMeds((prev) => prev.filter((m) => m.id !== id));
   };
 
