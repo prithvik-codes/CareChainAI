@@ -10,7 +10,7 @@ interface EmergencyProfile {
   current_medications: string | null;
 }
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http:// 10.157.36.194:8000/api";
+const API = process.env.NEXT_PUBLIC_API_URL || "http://10.166.189.194:8000/api";
 
 function calculateAge(dob: string): number {
   const today = new Date();

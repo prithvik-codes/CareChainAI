@@ -1,15 +1,10 @@
 """
-RAG Agent
-─────────
-Retrieval-Augmented Generation pipeline.
-
-Pipeline:
-  1. Encode user question → embedding
-  2. Search FAISS index for top-k similar chunks
-  3. Fetch chunk text from DB
-  4. Build a grounded prompt (kept under 200 tokens)
-  5. Call Gemini
-  6. Return answer (validated by Critic Agent)
+RAG Agent (Optimized)
+────────────────────
+Hybrid system:
+- Uses RAG only when needed
+- Uses normal chatbot for general queries
+- Minimizes token usage for Gemini free tier
 """
 
 import logging
@@ -26,18 +21,16 @@ logger = logging.getLogger(__name__)
 
 
 class RAGAgent:
-    """Handles vector retrieval and LLM-based Q&A."""
-
-    TOP_K = 2  # Only 2 chunks — keeps tokens low
+    TOP_K = 2
 
     def __init__(self):
         self._embedding_model = None
         self._faiss_index = None
         self._gemini_client = None
-        self._cache: dict[str, str] = {}  # Cache to avoid repeated API calls
+        self._cache: dict[str, str] = {}
         self._request_count = 0
 
-    # ── Lazy-loaded dependencies ──────────────────────────────────────────
+    # ── Lazy loading ─────────────────────────────────────────────
 
     @property
     def embedding_model(self):
@@ -48,13 +41,12 @@ class RAGAgent:
 
     @property
     def faiss_index(self):
-        """Load or create the FAISS flat-IP index."""
         if self._faiss_index is None:
             import faiss
             index_path = settings.FAISS_INDEX_PATH + ".index"
             if os.path.exists(index_path):
                 self._faiss_index = faiss.read_index(index_path)
-                logger.info("FAISS index loaded from disk | ntotal=%d", self._faiss_index.ntotal)
+                logger.info("FAISS index loaded | ntotal=%d", self._faiss_index.ntotal)
             else:
                 dim = self.embedding_model.get_sentence_embedding_dimension()
                 self._faiss_index = faiss.IndexFlatIP(dim)
@@ -63,135 +55,139 @@ class RAGAgent:
 
     @property
     def gemini(self):
-        """Lazy-load Gemini client — never initialised at module level."""
         if self._gemini_client is None:
             import google.generativeai as genai
             genai.configure(api_key=settings.GEMINI_API_KEY)
             model_name = getattr(settings, "GEMINI_MODEL", "gemini-2.0-flash-lite")
             self._gemini_client = genai.GenerativeModel(model_name)
-            logger.info("Gemini client initialized | model=%s", model_name)
+            logger.info("Gemini initialized | model=%s", model_name)
         return self._gemini_client
 
-    # ── Embedding & indexing ──────────────────────────────────────────────
+    # ── Context Detection ───────────────────────────────────────
+
+    def needs_context(self, question: str) -> bool:
+        keywords = [
+            "my", "mine", "report", "records",
+            "lab", "test", "result", "level",
+            "glucose", "cholesterol", "bp"
+        ]
+        q = question.lower()
+        return any(word in q for word in keywords)
+
+    # ── Embeddings ─────────────────────────────────────────────
 
     def embed_chunks(self, chunks: list[str]) -> np.ndarray:
-        """Return L2-normalised embedding matrix (n_chunks × dim)."""
         vecs = self.embedding_model.encode(
             chunks, normalize_embeddings=True, show_progress_bar=False
         )
         return vecs.astype("float32")
 
     def add_to_index(self, chunks: list[str]) -> list[int]:
-        """Add chunks to FAISS. Returns list of FAISS IDs assigned."""
+        if not chunks:
+            return []
+        import faiss
         vecs = self.embed_chunks(chunks)
         start_id = self.faiss_index.ntotal
         self.faiss_index.add(vecs)
-        self._save_index()
-        faiss_ids = list(range(start_id, self.faiss_index.ntotal))
-        logger.info("Added %d chunks to FAISS | new total=%d", len(chunks), self.faiss_index.ntotal)
-        return faiss_ids
+        
+        index_path = settings.FAISS_INDEX_PATH + ".index"
+        faiss.write_index(self.faiss_index, index_path)
+        logger.info("Added %d chunks to FAISS index. Total: %d", len(chunks), self.faiss_index.ntotal)
+        
+        return list(range(start_id, start_id + len(chunks)))
 
-    def _save_index(self):
-        import faiss
-        index_dir = os.path.dirname(settings.FAISS_INDEX_PATH)
-        if index_dir:
-            os.makedirs(index_dir, exist_ok=True)
-        faiss.write_index(self.faiss_index, settings.FAISS_INDEX_PATH + ".index")
-
-    # ── Retrieval ─────────────────────────────────────────────────────────
-
-    def search(self, query: str, top_k: int | None = None) -> tuple[list[int], list[float]]:
-        """Return (faiss_ids, scores) for top-k most similar chunks."""
+    def search(self, query: str, top_k: int | None = None):
         k = top_k or self.TOP_K
         q_vec = self.embed_chunks([query])
         scores, indices = self.faiss_index.search(q_vec, k)
         return indices[0].tolist(), scores[0].tolist()
 
-    # ── Answer generation ─────────────────────────────────────────────────
+    # ── General Chat (NO CONTEXT) ───────────────────────────────
+
+    def generate_general_answer(self, question: str) -> str:
+        prompt = (
+            "You are a helpful healthcare assistant.\n"
+            "Answer in 3 bullet points.\n"
+            "Do not give medical diagnosis.\n\n"
+            f"Question: {question[:100]}"
+        )
+
+        try:
+            response = self.gemini.generate_content(prompt)
+            return response.text
+        except Exception:
+            logger.exception("Gemini general call failed")
+            return "AI service unavailable."
+
+    # ── RAG Answer ─────────────────────────────────────────────
 
     def generate_answer(self, question: str, context_chunks: list[str]) -> str:
-        """
-        Build a minimal prompt and call Gemini.
-        Kept under 200 tokens by limiting context to 2 chunks × 100 chars.
-        """
-        # 1. Check cache — zero tokens for repeated questions
         cache_key = question.strip().lower()[:80]
         if cache_key in self._cache:
-            logger.info("Cache hit — skipping Gemini call")
             return self._cache[cache_key]
 
-        # 2. Limit context to 2 chunks, 100 chars each (~50 tokens)
+        # Limit + format context
         limited_chunks = [c[:100] for c in context_chunks[:2]]
-        context = " | ".join(limited_chunks)
+        context = "\n".join(f"- {c}" for c in limited_chunks)
 
-        # 3. Ultra-short prompt — total ~90 tokens
         prompt = (
-            f"Medical records: {context}\n"
-            f"Question: {question[:80]}\n"
-            f"Answer in 3 bullet points. No diagnosis. End: consult your doctor."
+            "You are a healthcare assistant.\n"
+            "Use the context below.\n"
+            "Answer in 3 bullet points.\n"
+            "Do not diagnose.\n\n"
+            f"Context:\n{context}\n\n"
+            f"Question: {question[:80]}"
         )
 
-        # Log estimated token count (1 token ≈ 4 chars)
         approx_tokens = len(prompt) // 4
         self._request_count += 1
-        logger.info(
-            "Gemini request #%d | ~%d tokens | question: %s",
-            self._request_count, approx_tokens, question[:50]
-        )
 
-        if self._request_count > 150:
-            logger.warning("⚠️ Approaching daily quota limit (%d/1500 requests)", self._request_count)
+        logger.info("Gemini request #%d | ~%d tokens", self._request_count, approx_tokens)
 
-        # 4. Call Gemini
         try:
             response = self.gemini.generate_content(prompt)
             result = response.text
             self._cache[cache_key] = result
             return result
-        except Exception as exc:
-            logger.exception("Gemini API call failed")
-            return (
-                f"AI service is currently unavailable.\n\n"
-                f"Error: {exc}\n\n"
-                "Please check your GEMINI_API_KEY in backend/.env and ensure "
-                "it is valid at https://aistudio.google.com/app/apikey"
-            )
+        except Exception:
+            logger.exception("Gemini RAG call failed")
+            return "AI service unavailable."
 
-    # ── Full RAG pipeline ─────────────────────────────────────────────────
+    # ── Main Pipeline ───────────────────────────────────────────
 
     async def ask(self, question: str, user_id: int, db) -> dict:
-        """
-        Full RAG pipeline.
-        Returns: {"answer": str, "sources": list[int], "retrieved_chunks": int}
-        """
         from sqlalchemy import select
         from app.models.embedding import Embedding
         from app.models.report import Report
 
-        # Guard: nothing in FAISS yet
-        if self.faiss_index.ntotal == 0:
+        # 🚀 STEP 1: Skip RAG if not needed
+        if not self.needs_context(question):
             return {
-                "answer": (
-                    "No medical records have been indexed yet.\n\n"
-                    "Please upload a report first, wait for it to show **done** "
-                    "status on the dashboard, then ask your question."
-                ),
+                "answer": self.generate_general_answer(question),
                 "sources": [],
                 "retrieved_chunks": 0,
             }
 
-        # Step 1: Vector search
+        # Guard: empty index
+        if self.faiss_index.ntotal == 0:
+            return {
+                "answer": "No records found. Upload a report first.",
+                "sources": [],
+                "retrieved_chunks": 0,
+            }
+
+        # STEP 2: Search
         faiss_ids, scores = self.search(question)
         valid_ids = [fid for fid, sc in zip(faiss_ids, scores) if fid >= 0 and sc > 0.1]
 
         if not valid_ids:
             return {
-                "answer": "I couldn't find relevant information in your uploaded records.",
+                "answer": "No relevant info found in your records.",
                 "sources": [],
                 "retrieved_chunks": 0,
             }
 
-        # Step 2: Fetch chunks from DB — scoped to this user only
+        # STEP 3: Fetch DB chunks
         stmt = (
             select(Embedding)
             .join(Report, Embedding.report_id == Report.id)
@@ -203,27 +199,23 @@ class RAGAgent:
 
         if not embeddings:
             return {
-                "answer": (
-                    "No matching records found for your account.\n\n"
-                    "Make sure your reports have been fully processed "
-                    "(status = **done**) before asking questions."
-                ),
+                "answer": "No matching records found.",
                 "sources": [],
                 "retrieved_chunks": 0,
             }
 
         chunks = [e.text_chunk for e in embeddings]
-        source_report_ids = list({e.report_id for e in embeddings})
+        source_ids = list({e.report_id for e in embeddings})
 
-        # Step 3: Generate answer
+        # STEP 4: Generate answer
         answer = self.generate_answer(question, chunks)
 
         return {
             "answer": answer,
-            "sources": source_report_ids,
+            "sources": source_ids,
             "retrieved_chunks": len(chunks),
         }
 
 
-# Module-level singleton — shared across requests
+# Singleton
 rag_agent = RAGAgent()

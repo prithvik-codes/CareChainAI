@@ -31,7 +31,7 @@ function calculateAge(dob: string): number {
   return age;
 }
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http:// 10.157.36.194:8000/api";
+const API = process.env.NEXT_PUBLIC_API_URL || "http://10.166.189.194:8000/api";
 
 function QRCode({ value }: { value: string }) {
   const url = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(value)}`;
@@ -68,7 +68,7 @@ export default function EmergencyPage() {
   // Build QR URL — include DOB as query param so public page can show age
   const getQrUrl = () => {
     if (!qrData) return "";
-    const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
+    const origin = typeof window !== "undefined" ? window.location.origin : "http://10.166.189.194:3000";
     const base   = `${origin}/emergency/public/${qrData.token}`;
     return dob ? `${base}?dob=${dob}` : base;
   };

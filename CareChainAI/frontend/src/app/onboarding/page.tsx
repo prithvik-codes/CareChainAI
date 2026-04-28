@@ -25,7 +25,7 @@ export default function OnboardingPage() {
   const saveProfile = async () => {
     setSaving(true);
     try {
-      await fetch("http://10.157.36.194:8000/api/emergency/profile", {
+      await fetch("http://10.166.189.194:8000/api/emergency/profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({

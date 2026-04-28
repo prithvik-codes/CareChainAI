@@ -10,7 +10,7 @@ export default function SignupPage() {
     setError("");
     setLoading(true);
     try {
-      const res = await fetch("http://10.157.36.194:8000/api/auth/signup", {
+      const res = await fetch("http://10.166.189.194:8000/api/auth/signup", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify(form),

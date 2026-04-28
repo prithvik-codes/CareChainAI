@@ -12,12 +12,19 @@ interface Message {
 }
 
 const SUGGESTIONS = [
-  "What does my latest blood test show?",
-  "Explain my MRI results in simple terms",
-  "What medications am I currently on?",
-  "Are there any abnormal values in my reports?",
-  "Summarise my health history",
-  "What did my doctor prescribe last visit?",
+  // "What does my latest blood test show?",
+  // "Explain my MRI results in simple terms",
+  // "What medications am I currently on?",
+  // "Are there any abnormal values in my reports?",
+  // "Summarise my health history",
+  // "What did my doctor prescribe last visit?",
+  "How much water should I drink daily?",
+  "What is a normal body temperature?",
+  "What are signs of depression?",
+  "How can I improve my mood?",
+  "How often should I get a health checkup?",
+  "How much exercise should I do daily?",
+  "What is a balanced diet?"
 ];
 
 function handleLogout() {
@@ -72,7 +79,7 @@ export default function AskAIPage() {
 
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch("http://localhost:8000/api/ai/ask", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api"}/ai/ask`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -47,7 +47,7 @@ export default function DoctorDashboard() {
     if (role === "patient") { window.location.href = "/dashboard"; return; }
     if (name) setUserName(name);
 
-    fetch("http://10.157.36.194:8000/api/reports/", {
+    fetch("http://10.166.189.194:8000/api/reports/", {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => r.json())

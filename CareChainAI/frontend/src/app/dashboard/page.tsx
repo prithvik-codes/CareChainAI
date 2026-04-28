@@ -81,10 +81,10 @@ export default function DashboardPage() {
 
     const h = { Authorization: `Bearer ${token}` };
     Promise.all([
-      fetch("http://10.157.36.194:8000/api/reports/",      { headers: h }).then((r) => r.json()),
-      fetch("http://10.157.36.194:8000/api/vitals/",       { headers: h }).then((r) => r.json()),
-      fetch("http://10.157.36.194:8000/api/medications/",  { headers: h }).then((r) => r.json()),
-      fetch("http://10.157.36.194:8000/api/appointments/", { headers: h }).then((r) => r.json()),
+      fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api"}/reports/`,      { headers: h }).then((r) => r.json()),
+      fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api"}/vitals/`,       { headers: h }).then((r) => r.json()),
+      fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api"}/medications/`,  { headers: h }).then((r) => r.json()),
+      fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api"}/appointments/`, { headers: h }).then((r) => r.json()),
     ]).then(([rp, v, m, a]) => {
       setReports(Array.isArray(rp) ? rp : []);
       setVitals(Array.isArray(v) ? v : []);
@@ -96,7 +96,7 @@ export default function DashboardPage() {
   const handleDelete = async (id: number) => {
     setDeletingId(id);
     const token = localStorage.getItem("token");
-    const res = await fetch(`http://10.157.36.194:8000/api/reports/${id}`, {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api"}/reports/${id}`, {
       method: "DELETE", headers: { Authorization: `Bearer ${token}` },
     });
     if (res.ok || res.status === 204) setReports((prev) => prev.filter((r) => r.id !== id));

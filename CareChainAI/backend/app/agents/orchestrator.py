@@ -11,6 +11,7 @@ AI-extracted values — AI only fills in fields the user left blank.
 """
 
 import logging
+import asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.ingestion_agent import IngestionAgent
@@ -57,7 +58,7 @@ class Orchestrator:
 
         try:
             # ── Step 1: Ingest ────────────────────────────────────────────
-            ingestion_result = self.ingestion.run(file_path)
+            ingestion_result = await asyncio.to_thread(self.ingestion.run, file_path)
             if not ingestion_result["success"]:
                 raise RuntimeError(f"Ingestion failed: {ingestion_result['error']}")
 
@@ -66,7 +67,7 @@ class Orchestrator:
             report.file_type = ingestion_result["file_type"]
 
             # ── Step 2: Timeline extraction ───────────────────────────────
-            meta = self.timeline.run(clean_text)
+            meta = await asyncio.to_thread(self.timeline.run, clean_text)
 
             # User-provided fields take priority — only fill with AI if blank
             report.report_date = (
@@ -86,7 +87,7 @@ class Orchestrator:
             # ── Step 3: Chunk + embed ─────────────────────────────────────
             chunks = self._chunk_text(clean_text)
             if chunks:
-                faiss_ids = rag_agent.add_to_index(chunks)
+                faiss_ids = await asyncio.to_thread(rag_agent.add_to_index, chunks)
                 for chunk, fid in zip(chunks, faiss_ids):
                     emb = Embedding(report_id=report_id, text_chunk=chunk, faiss_id=fid)
                     db.add(emb)

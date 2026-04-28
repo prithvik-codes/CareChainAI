@@ -61,10 +61,10 @@ export default function HealthScorePage() {
     if (!token) { window.location.href = "/auth/login"; return; }
     const h = { Authorization: `Bearer ${token}` };
     Promise.all([
-      fetch("http://10.157.36.194:8000/api/vitals/",       { headers: h }).then((r) => r.json()),
-      fetch("http://10.157.36.194:8000/api/medications/",  { headers: h }).then((r) => r.json()),
-      fetch("http://10.157.36.194:8000/api/appointments/", { headers: h }).then((r) => r.json()),
-      fetch("http://10.157.36.194:8000/api/reports/",      { headers: h }).then((r) => r.json()),
+      fetch("http://10.166.189.194:8000/api/vitals/",       { headers: h }).then((r) => r.json()),
+      fetch("http://10.166.189.194:8000/api/medications/",  { headers: h }).then((r) => r.json()),
+      fetch("http://10.166.189.194:8000/api/appointments/", { headers: h }).then((r) => r.json()),
+      fetch("http://10.166.189.194:8000/api/reports/",      { headers: h }).then((r) => r.json()),
     ]).then(([v, m, a, rp]) => {
       setVitals(Array.isArray(v) ? v : []);
       setMedications(Array.isArray(m) ? m : []);

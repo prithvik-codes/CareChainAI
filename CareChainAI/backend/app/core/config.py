@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     FAISS_INDEX_PATH: str = "./faiss_index"
 
     # ── CORS ─────────────────────────────────────────────
-    CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000", "http://10.166.189.194:3000"]
 
     class Config:
         env_file = ".env"

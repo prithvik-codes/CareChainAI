@@ -47,7 +47,7 @@ export default function ProfilePage() {
   });
 
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : "";
-  const API   = process.env.NEXT_PUBLIC_API_URL || "http:// 10.157.36.194:8000/api";
+  const API   = process.env.NEXT_PUBLIC_API_URL || "http://10.166.189.194:8000/api";
 
   useEffect(() => {
     if (!token) { window.location.href = "/auth/login"; return; }
